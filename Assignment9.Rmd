@@ -1,0 +1,359 @@
+---
+title: "Assignment9"
+author: "samriddh Gupta"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+## libraries
+```{r}
+library(countrycode)
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+```
+
+
+```{r}
+theme_set(theme_bw())
+
+dat <-
+  read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+
+deaths_by_state <- dat %>%
+  group_by(state,date) %>%
+  summarize(total_deaths = sum(deaths)) %>%
+  ungroup() %>%
+  filter(date == max(date)) %>%
+  arrange(desc(total_deaths))
+deaths_by_state
+
+```
+
+## EX1
+```{r}
+deaths_by_date<-dat %>% 
+  group_by(state,date) %>%
+  summarize(total_deaths = sum(deaths),
+            Total_cases=sum(cases)) %>% 
+  arrange(desc(Total_cases))
+deaths_by_date
+```
+
+```{r}
+dat_small <-
+  dat %>%
+  filter(state %in% c("South Carolina", "Connecticut")) %>%
+  mutate(county = factor(county))
+
+dat_small %>%
+  filter(state == "Connecticut") %>%
+  ggplot(aes(x = date, y = cases, group = county, col = county)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ state) +
+  scale_y_log10() +
+  scale_color_brewer(palette = "Set1")
+
+```
+
+## Ex2
+```{r}
+dat_small <-
+  dat %>%
+  filter(state %in% c("District of Columbia", "Maryland","Virginia")) %>%
+  filter(county %in% c("Anne Arundel","Charles","Alexandria city","District of Columbia","Frederick","Howard","Montgomery","Prince George's","Arlington","Fairfax","Loudoun","Prince William")) %>% 
+  mutate(county = factor(county),
+         date = as.Date(date,format = "%Y-%m-%d"))
+
+dat_small %>%
+  ggplot(aes(x = date, y = cases, group = county, col = county)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ state) +
+  scale_y_log10() +
+  theme(legend.position = "bottom")
+
+```
+
+## EX3
+
+```{r}
+DMV<-dat_small %>% 
+  group_by(date) %>% 
+  summarize(total_deaths = sum(deaths),
+            Total_cases=sum(cases))
+ggplot(DMV,aes(x=date,y=Total_cases))+
+  geom_line()+
+  geom_point()+
+  ggtitle("comfirmed Cases of COVID19 in DMV ")
+
+ggplot(DMV,aes(x=date,y=total_deaths))+
+  geom_line(color="#EE0000")+
+  geom_point()+
+  ggtitle("Deaths due of COVID19 in DMV ")
+
+
+DMV<-DMV %>% 
+  mutate(Cases=Total_cases,
+         Death=total_deaths) %>% 
+  select(date,Cases,Death) %>% 
+  pivot_longer(-date,names_to = "Status",values_to = "Value")
+
+ggplot(DMV,aes(x=date,y=log(Value),color=Status))+
+  geom_line()+
+  geom_point()+
+  ggtitle("COVID19 in DMV ")
+
+```
+
+## EX4
+```{r}
+dat <-
+  read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/archived_data/archived_time_series/time_series_19-covid-Confirmed_archived_0325.csv")
+
+new_dat<-dat %>%
+  pivot_longer(-c(`Province/State`,`Country/Region`,Lat,Long),names_to = "date",values_to = "Confirmed_Cases")
+
+new_dat$`Country/State`= paste(new_dat$`Province/State`,new_dat$`Country/Region`,sep = ",")
+new_dat
+```
+
+## Ex5
+
+```{r}
+new_dat1<-new_dat %>% 
+  mutate(continent=countrycode(sourcevar = `Country/Region`,
+                            origin = "country.name",
+                            destination = "continent")) %>% 
+    mutate(continent=case_when(`Country/Region`=="South Yemen (former)"~"Asia",
+                             `Country/Region`=="Akrotiri and Dhekelia"~"Europe",
+                             `Country/Region`=="Central African Rep."~"Africa",
+                             `Country/Region`=="Channel Islands"~"Europe",
+                             `Country/Region`=="Cocos Island"~"Asia",
+                             `Country/Region`=="Czechoslovakia"~"Europe",
+                             `Country/Region`=="East Germany"~"Europe",
+                             `Country/Region`=="Eritrea and Ethiopia"~"Africa",
+                             `Country/Region`=="Kosovo"~"Europe",
+                             `Country/Region`=="North Yemen (former)"~"Asia",
+                             `Country/Region`=="North Yemen (former)"~"Americas",
+                             `Country/Region`=="St. Martin"~"Asia",
+                             `Country/Region`=="Yugoslavia"~"Europe",
+                             `Country/Region`=="Serbia and Montenegro"~"Asia",
+                             TRUE~continent))
+
+new_dat1
+
+```
+
+## EX6
+```{r}
+
+new_dat2<-new_dat1 %>% 
+  select(`Country/Region`,Confirmed_Cases,`Country/State`) %>% 
+  group_by(`Country/State`) %>% 
+  summarize(Confirmed_Cases_sum=sum(Confirmed_Cases)) %>%
+  ungroup() %>%
+  arrange(desc(Confirmed_Cases_sum)) 
+
+  
+
+new_dat2<-head(new_dat2,25)
+new_dat2
+country<-new_dat2$`Country/State`
+```
+
+
+## EX7
+```{r}
+new_dat3<-new_dat %>% 
+  mutate(continent=countrycode(sourcevar = `Country/Region`,
+                            origin = "country.name",
+                            destination = "continent")) %>% 
+  mutate(continent=case_when(`Country/Region`=="Kosovo"~"Europe",
+                             TRUE~continent),
+         date=as.Date(date,format = "%m/%d/%Y")) %>% 
+  filter(`Country/State` %in% country)
+
+new_dat3 %>%
+  ggplot(aes(x = date, y = Confirmed_Cases,color=`Country/Region`)) +
+  geom_line() +
+  facet_wrap(~ continent) +
+  scale_y_log10() +
+  theme(legend.position = "bottom")
+```
+
+## EX8
+```{r}
+data<-new_dat1 %>% 
+  filter(`Province/State`=="New York") %>% 
+  select(date,Confirmed_Cases) %>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"))
+
+data1<-deaths_by_date %>% 
+  select(date,state,Total_cases) %>% 
+  filter(state=="New York") %>% 
+  mutate(date=as.Date(date,format = "%Y-%m-%d")) %>% 
+  select(date,Total_cases)
+
+data3<-full_join(data,data1,all=T)
+data3
+
+
+  
+```
+
+I think that there is change in number because the tells today number of positive cases in first part and second one tells the total cases after people are recovered.
+
+```{r}
+data3 %>% 
+  filter(date>ymd(20200301)) %>% 
+  ggplot(aes(x=date,y=log(Total_cases)))+
+  geom_line()+
+  geom_point(aes(y=log(Confirmed_Cases)),color="blue")
+  ggtitle("Deaths due of COVID19 in DMV ")
+```
+
+```{r}
+Slowed_cases <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Hubei,China", "Diamond Princess,Cruise Ship","Guangdong,China","Henan,China","Zhejiang,China")) %>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"))
+
+Slowed_cases %>%
+  ggplot(aes(x = date, y = Confirmed_Cases)) +
+    geom_point() +
+  facet_wrap(~ `Country/State`, scales = "free")
+
+```
+
+
+```{r}
+# function needed for visualization purposes
+sigmoid = function(x, params) {
+  params[1] / (1 + exp(-params[2] * (x - params[3])))
+}
+    
+x = 1:53
+y = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0.1,0.18,0.18,0.18,0.33,0.33,0.33,0.33,0.41,
+  0.41,0.41,0.41,0.41,0.41,0.5,0.5,0.5,0.5,0.68,0.58,0.58,0.68,0.83,0.83,0.83,
+  0.74,0.74,0.74,0.83,0.83,0.9,0.9,0.9,1,1,1,1,1,1,1)
+df <- tibble(x = x, y = y)    
+# fitting code
+fitmodel <- nls(y ~ a /(1 + exp(-b * (x - c))), data = df,
+                start = list(a = 1, b = 0.5, c = 25))
+    
+# visualization code
+# get the coefficients using the coef function
+params=coef(fitmodel)
+    
+df$y2 <- sigmoid(x, params)
+df %>% ggplot(aes(x, y2)) + geom_line() + geom_point(y = y)
+```
+
+
+## EX10
+```{r}
+sigmoid = function(x, params) {
+  params[1] / (1 + exp(-params[2] * (x - params[3])))
+}
+
+Slowed_cases <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Hubei,China"))%>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"),
+         date_int=unclass(date))
+
+
+startK <- max(Slowed_cases$Confirmed_Cases)
+fitmodel <-nls(Confirmed_Cases ~ K /( (1 +  
+                                         exp(-B * (date_int - t0))) ) , 
+                data = Slowed_cases,
+                start = list(K = startK,  B = .25, t0 = 18300),
+                control = list(maxiter = 1000, warnOnly = TRUE))
+
+params=coef(fitmodel)
+
+Slowed_cases$y2 <- sigmoid(Slowed_cases$date_int, params)
+
+ggplot(Slowed_cases,aes(date, y2)) + 
+  geom_line() + 
+  geom_point(aes(y = Confirmed_Cases))
+
+summary(fitmodel)
+broom::glance(fitmodel)
+```
+
+## EX11
+
+```{r}
+sigmoid = function(x, params) {
+  params[1] / (1 + exp(-params[2] * (x - params[3])))^(1/params[4])
+}
+
+startK <- max(Slowed_cases$Confirmed_Cases)
+fitmodel <-nls(Confirmed_Cases ~ K /(1 +exp(-B * (date_int - t0)))^(1/v),
+               data = Slowed_cases,
+               start = list(K = startK,  B = .25, t0 = 18300,v=1),
+               control = list(maxiter = 1000, warnOnly = TRUE))
+
+params=coef(fitmodel)
+
+Slowed_cases$y3 <- sigmoid(Slowed_cases$date_int, params)
+
+ggplot(Slowed_cases,aes(date, y2)) + 
+  geom_line() + 
+  geom_point(aes(y = Confirmed_Cases))+
+  geom_line(aes(y = y3),color="red")
+
+summary(fitmodel)
+broom::glance(fitmodel)
+```
+
+
+## EX12
+```{r}
+Hubei <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Hubei,China"))%>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"),
+         date_int=unclass(date))
+
+Guangdong <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Guangdong,China"))%>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"),
+         date_int=unclass(date))
+
+Diamond_Princess <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Diamond Princess,Cruise Ship"))%>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"),
+         date_int=unclass(date))
+
+Henan <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Henan,China"))%>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"),
+         date_int=unclass(date))
+
+Zhejiang <- new_dat1 %>% 
+  filter(`Country/State` %in% c("Zhejiang,China"))%>% 
+  mutate(date=as.Date(date,format = "%m/%d/%y"),
+         date_int=unclass(date))
+
+
+country_mod2 <- function(df){
+  startK <- max(df$Confirmed_Cases)
+  nls(Confirmed_Cases ~ K /( (1 +  exp(-B * (date_int - t0))) ) ^(1/v) , 
+                data = df,
+                start = list(K = startK,  B = .25, t0 = 18300, v = 1),
+                control = list(maxiter = 1000, warnOnly = TRUE))
+}
+
+data<-c(Zhejiang,Henan,Diamond_Princess,Guangdong,Hubei)
+
+#map(data,country_mod2)
+
+country_mod2(Zhejiang)
+country_mod2(Henan)
+country_mod2(Diamond_Princess)
+country_mod2(Guangdong)
+country_mod2(Hubei)
+
+```
+
